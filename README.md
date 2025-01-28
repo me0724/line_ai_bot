@@ -1,3 +1,5 @@
-# A Simple Line Bot with Azure OpenAI
+#＜ボットの説明＞
 
-Too simple.
+私の好きなバンド・UNISON SQUARE GARDENについて質問できます。
+対応しているのは、メンバ―・代表曲・デビュー・最新アルバムについてです。
+それ以外の質問をされると、「UNISON SQUARE GARDENについての質問がよくわからへんかったわ…別の質問をしてみてな！」と返信されるようにしましたが、誤作動も多いです。すみません。
