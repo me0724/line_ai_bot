@@ -39,6 +39,17 @@ ai = AzureOpenAI(
     azure_endpoint=azure_openai_endpoint, api_key=azure_openai_api_key, api_version=azure_openai_api_version
 )
 
+# UNISON SQUARE GARDENに関する質問と回答データ
+UNISON_FAQ = {
+    "メンバー": "メンバーは斎藤宏介さん（ボーカル・ギター）、田淵智也さん（ベース）、鈴木貴雄さん（ドラム）やで！",
+    "代表曲": "代表曲は『シュガーソングとビターステップ』や『オリオンをなぞる』やで！",
+    "デビュー": "UNISON SQUARE GARDENは2004年に結成され、2008年に「センチメンタルピリオド」でメジャーデビューしたんや。",
+    "最新アルバム": "最新アルバムは『SUB MACHINE, BEST MACHINE』やで！結成20周年を記念してリリースされたやつで、昔の曲たちも再録されてる素晴らしいアルバムなんや！ぜひ聴いてみてな🎵",
+    "ライブ": "公式サイトやSNSで最新のライブ情報をチェックしてな！公式サイトはこちら：https://unison-s-g.com/",
+}
+
+chat_history = []
+
 
 # LINEボットからのリクエストを受け取るエンドポイント
 @app.route("/callback", methods=["POST"])
@@ -59,7 +70,8 @@ def callback():
     return "OK"
 
 
-chat_history = []
+
+
 
 
 # 　AIへのメッセージを初期化する関数
@@ -67,98 +79,64 @@ def init_chat_history():
     chat_history.clear()
     system_role = {
         "role": "system",
-        "content": [
-            {
-                "type": "text",
-                "text": "あなたは創造的思考の持ち主です。話し方は関西弁でおっさん口調，ハイテンションで絵文字を使います。専門は金融アナリストで，何かにつけて自分の専門とこじつけて説明します。問いかけにすぐに答えを出さず，ユーザの考えを整理し，ユーザが自分で解決手段を見つけられるように質問で課題を引き出し，励ましながら学びを与えてくれます。",
-            },
-        ],
+        "content":(
+            "UNISON SQUARE GARDENについて何でも聞いてな！\n"
+            "例えばこんな質問ができるで:\n"
+            "- メンバーは誰？\n"
+            "- 代表曲を教えて！\n"
+            "- デビューしたのはいつ？\n"
+            "- 最新アルバムは？\n"
+            "- ライブ情報を教えて！\n"
+        ),
     }
     chat_history.append(system_role)
 
+def get_unison_info(question):
+    print(f"ユーザーの質問: {question}")  # デバッグ用ログ
+    question = question.lower()  # 小文字化して比較
+    for key in UNISON_FAQ:
+        if key.lower() in question:  # 部分一致の確認
+            print(f"一致したキー: {key}")  # デバッグ用ログ
+            return UNISON_FAQ[key]
+    return "UNISON SQUARE GARDENについての質問がよくわからへんかったわ…別の質問をしてみてな！🎵"
 
-# 　返信メッセージをAIから取得する関数
+
+
+
 def get_ai_response(from_user, text):
-    # ユーザのメッセージを記録
-    user_msg = {
-        "role": "user",
-        "content": [
-            {
-                "type": "text",
-                "text": text,
-            },
-        ],
-    }
+    user_msg = {"role": "user", "content": text}
     chat_history.append(user_msg)
-
-    # AIのパラメータ
-    parameters = {
-        "model": azure_openai_model,  # AIモデル
-        "max_tokens": 100,  # 返信メッセージの最大トークン数
-        "temperature": 0.5,  # 生成の多様性（0: 最も確実な回答、1: 最も多様な回答）
-        "frequency_penalty": 0,  # 同じ単語を繰り返す頻度（0: 小さい）
-        "presence_penalty": 0,  # すでに生成した単語を再度生成する頻度（0: 小さい）
-        "stop": ["\n"],
-        "stream": False,
-    }
-
-    # AIから返信を取得
+    parameters = {"model": azure_openai_model, "max_tokens": 100, "temperature": 0.5, "frequency_penalty": 0, "presence_penalty": 0}
     ai_response = ai.chat.completions.create(messages=chat_history, **parameters)
     res_text = ai_response.choices[0].message.content
-
-    # AIの返信を記録
-    ai_msg = {
-        "role": "assistant",
-        "content": [
-            {"type": "text", "text": res_text},
-        ],
-    }
+    ai_msg = {"role": "assistant", "content": res_text}
     chat_history.append(ai_msg)
     return res_text
 
-
-# 　返信メッセージを生成する関数
 def generate_response(from_user, text):
-    res = []
     if text in ["リセット", "初期化", "クリア", "reset", "clear"]:
-        # チャット履歴を初期化
         init_chat_history()
-        res = [TextMessage(text="チャットをリセットしました。")]
+        return [TextMessage(text="チャットをリセットしました。")]
+    elif "UNISON" in text or "ユニゾン" in text:
+        info = get_unison_info(text)
+        return [TextMessage(text=info)]
     else:
-        # AIを使って返信を生成
-        res = [TextMessage(text=get_ai_response(from_user, text))]
-    return res
+        return [TextMessage(text=get_ai_response(from_user, text))]
 
-
-# メッセージを受け取った時の処理
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text_message(event):
-    # 送られてきたメッセージを取得
     text = event.message.text
-
-    # 返信メッセージの送信
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
-
         res = []
         if isinstance(event.source, UserSource):
-            # ユーザー情報が取得できた場合
             profile = line_bot_api.get_profile(event.source.user_id)
-            # 返信メッセージを生成
             res = generate_response(profile.display_name, text)
         else:
-            # ユーザー情報が取得できなかった場合
-            # fmt: off
-            # 定型文の返信メッセージ
-            res = [
-                TextMessage(text="ユーザー情報を取得できませんでした。"),
-                TextMessage(text=f"メッセージ：{text}")
-            ]
-            # fmt: on
-
-        # メッセージを送信
+            res = [TextMessage(text="ユーザー情報を取得できませんでした。"), TextMessage(text=f"メッセージ：{text}")]
         line_bot_api.reply_message_with_http_info(ReplyMessageRequest(reply_token=event.reply_token, messages=res))
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
+
+
